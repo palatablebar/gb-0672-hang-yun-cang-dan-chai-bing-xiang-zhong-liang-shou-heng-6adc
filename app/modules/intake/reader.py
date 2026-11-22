@@ -43,4 +43,4 @@ def read_source(state, fields, aliases):
             selected.append(rows[0]);state['counts']['duplicate']+=len(rows)-1
     state['records']=selected
     state['encoding']=encoding
-    state['views'][state['context']['keys'][0]]={'rows':[dict(r) for r in selected], 'metrics':{'采信行':len(selected),'隔离行':len(state['quarantine']),'重复行':state['counts']['duplicate']},'title':'原始证据'}
+    state['views']['intake']={'rows':[dict(r) for r in selected], 'metrics':{'采信行':len(selected),'隔离行':len(state['quarantine']),'重复行':state['counts']['duplicate']},'title':'原始证据'}

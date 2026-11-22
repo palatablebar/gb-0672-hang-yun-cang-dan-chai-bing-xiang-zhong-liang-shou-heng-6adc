@@ -12,7 +12,8 @@
 | M4 危险品检查 | 执行并复核危险品检查 | `POST /api/hazard` | `app/modules/hazard/rules.py` | `tests/test_hazard.py` |
 | M5 净毛重核验 | 执行并复核净毛重核验 | `POST /api/weight` | `app/modules/weight/rules.py` | `tests/test_weight.py` |
 | M6 报关对账 | 执行并复核报关对账 | `POST /api/reconcile` | `app/modules/reconcile/rules.py` | `tests/test_reconcile.py` |
-| M7 版本封存 | 执行并复核版本封存 | `POST /api/archive` | `app/modules/archive/rules.py` | `tests/test_archive.py` |
+| M7 环路修复裁定 | 裁决断边口径并逐张主单裁定 | `POST /api/repair` | `app/modules/repair/rules.py` | `tests/test_repair.py` |
+| M8 版本封存 | 执行并复核版本封存 | `POST /api/archive` | `app/modules/archive/rules.py` | `tests/test_archive.py` |
 
 ## 陷阱登记
 
@@ -29,6 +30,8 @@
 | TRAP-06 | 全角千分位 | 静默错算或证据丢失 | 以可复核规则显式处理 | `app/modules/packaging/rules.py` | `tests/test_packaging.py::test_fullwidth_decimal` |
 | TRAP-20 | 拆并依赖环 | 静默错算或证据丢失 | 以可复核规则显式处理 | `app/modules/grouping/rules.py` | `tests/test_grouping.py::test_cycle_real` |
 | TRAP-21 | 缺失父级 | 静默错算或证据丢失 | 以可复核规则显式处理 | `app/modules/grouping/rules.py` | `tests/test_grouping.py::test_missing_parent_real` |
+| TRAP-22 | 环路修复误断边 | 任选一条边切断，改错申报依据 | 只在候选断边唯一通过图校验与逐层守恒且有外部证据时修复；否则整组挂起，未受影响主单逐票放行 | `app/modules/repair/rules.py` | `tests/test_repair.py::test_dirty_cycle_has_no_unique_edge` |
+| TRAP-23 | 修复回执重放 | 重试同一修复产生重复裁定 | 以 run_id 与修复依据生成回执，同回执只保留一条；失败切换保留上一版 | `app/store.py` | `tests/test_repair.py::test_decision_receipt_is_idempotent` |
 
 ## 对账规则
 

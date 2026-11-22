@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+{% block content %}
+{% set r = repair %}
+{% set comps = r.view.components %}
+{% set cands = r.view.candidates %}
+<div class="repair-grid">
+<section class="panel verdict">
+  <h2>修复裁定<sup>1</sup><small>{{ r.policy_label }}</small></h2>
+  <p class="ruling">{{ r.verdict }}</p>
+  {% if r.active %}<p class="note active-note">本页按已生效裁定 v{{ r.active.version }} 展示（{{ r.active.policy_label if r.active.policy_label else r.active.policy }}）；未落定的计算口径不构成放行依据。</p>
+  {% else %}<p class="note active-note">尚未落定裁定；本页为当前计算口径，不构成放行依据。</p>{% endif %}
+  <div class="rule-strip">
+    <div><label>采用原则</label><b>{{ r.policy_label }}</b></div>
+    <div><label>有效裁定</label><b>{% if r.active %}v{{ r.active.version }}{% else %}未落定{% endif %}</b></div>
+    <div><label>回执</label><b class="mono">{% if r.active %}{{ r.active.receipt }}{% else %}{{ r.receipt }}{% endif %}</b></div>
+    <div><label>整套可封存</label><b class="{% if not r.batch_sealable %}fail{% endif %}">{{ '是' if r.batch_sealable else '否' }}</b></div>
+  </div>
+  <form id="decision-form" class="decision-form">
+    <label>裁决口径
+      <select id="policy">
+        <option value="unique_only" {% if r.policy=='unique_only' %}selected{% endif %}>只处理证据能唯一定位的错误关系</option>
+        <option value="wait_group" {% if r.policy=='wait_group' %}selected{% endif %}>等整组补齐</option>
+      </select>
+    </label>
+    <button id="decide" type="submit">落定裁定</button>
+    <output id="decision-message" aria-live="polite"></output>
+  </form>
+  {% if r.selection_errors %}<div class="alert">{% for e in r.selection_errors %}{{ e }}<br>{% endfor %}</div>{% endif %}
+</section>
+
+<section class="panel">
+  <h2>策略对照<sup>2</sup><small>同一批证据</small></h2>
+  <div class="table-scroll"><table>
+    <thead><tr><th>策略</th><th>修复组件</th><th>待补齐</th><th>可封存主单</th><th>整批封存</th><th>说明</th></tr></thead>
+    <tbody>{% for p in r.comparison %}<tr class="{% if p.policy==r.policy %}chosen{% endif %}">
+      <td>{{ p.label }}</td><td class="num">{{ p.components_repaired }}</td><td class="num">{{ p.components_held }}</td>
+      <td class="num">{{ p.masters_sealable }}</td><td>{{ '是' if p.batch_sealable else '否' }}</td><td class="note">{{ p.note }}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+
+<section class="panel wide">
+  <h2>逐张主单<sup>3</sup><small>{{ r.masters|length }} 张</small></h2>
+  <div class="table-scroll"><table>
+    <thead><tr><th>主单</th><th>采用的依据</th><th>修复后件数</th><th>修复后净重 kg</th><th>修复后毛重 kg</th><th>影响范围</th><th>能否封存</th><th>封存说明</th></tr></thead>
+    <tbody>{% for m in r.masters %}<tr class="{% if m.sealable!='是' %}blocked{% endif %}">
+      <td class="mono">{{ m.id }}<small class="kind">{{ m.kind }}</small></td>
+      <td class="note">{{ m.basis }}</td>
+      <td class="num">{{ m.repair_pieces }}</td><td class="num">{{ m.repair_net_kg }}</td><td class="num">{{ m.repair_gross_kg }}</td>
+      <td class="note">{{ m.impact }}</td>
+      <td class="{% if m.sealable!='是' %}fail{% endif %}">{{ m.sealable }}</td>
+      <td class="note">{{ m.seal_reason }}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+
+<section class="panel">
+  <h2>图错误组件<sup>4</sup><small>{{ comps|length }} 组</small></h2>
+  <div class="table-scroll"><table>
+    <thead><tr><th>组件</th><th>类型</th><th>环路径</th><th>原始行</th><th>箱号</th><th>状态</th><th>依据</th></tr></thead>
+    <tbody>{% for c in comps %}<tr>
+      <td class="mono">{{ c.nodes }}</td><td>{{ c.kind }}</td><td class="mono">{{ c.path }}</td>
+      <td class="num">{{ c.lines }}</td><td>{{ c.containers }}</td>
+      <td class="{% if c.status!='已修复' %}fail{% endif %}">{{ c.status }}</td><td class="note">{{ c.basis }}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+
+<section class="panel">
+  <h2>候选断边<sup>5</sup><small>不猜测</small></h2>
+  <div class="table-scroll"><table>
+    <thead><tr><th>组件</th><th>候选断边</th><th>结构有效</th><th>逐层守恒</th><th>断边后总量 件/净/毛</th><th>决定性证据</th><th>说明</th></tr></thead>
+    <tbody>{% for c in cands %}<tr>
+      <td class="mono">{{ c.component }}</td><td>{{ c.candidate }}</td><td>{{ c.valid }}</td><td>{{ c.conservation }}</td>
+      <td class="num">{{ c.totals }}</td><td class="note">{{ c.evidence }}</td><td class="note">{{ c.reason }}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+
+<section class="panel">
+  <h2>整批阻断<sup>6</sup></h2>
+  {% if r.batch_blockers %}<ul class="blockers">{% for b in r.batch_blockers %}<li>{{ b }}</li>{% endfor %}</ul>{% else %}<p class="note">无阻断，整套可封存。</p>{% endif %}
+</section>
+
+<section class="panel wide">
+  <h2>裁定回执<sup>7</sup><small>同一回执重试不新增结果</small></h2>
+  {% if decisions.history %}
+  <div class="table-scroll"><table>
+    <thead><tr><th>版本</th><th>回执</th><th>策略</th><th>断边</th><th>整批封存</th><th>时间</th></tr></thead>
+    <tbody>{% for d in decisions.history %}
+      <tr class="{% if decisions.active and d.version==decisions.active.version %}chosen{% endif %}">
+        <td class="num">v{{ d.version }}</td><td class="mono">{{ d.receipt }}</td><td>{{ d.policy }}</td>
+        <td class="mono">{% for e in d.edges %}{{ e.child }}→{{ e.parent }}{% if not loop.last %}；{% endif %}{% else %}未断边{% endfor %}</td>
+        <td>{{ '是' if d.batch_sealable else '否' }}</td><td class="mono">{{ d.created_at[:19] }}</td>
+      </tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="note">尚未落定裁定，页面显示的是当前计算口径，不构成放行依据。</p>{% endif %}
+  {% if decisions.attempts %}<h3>失败尝试（不覆盖已生效裁定）</h3>
+  <div class="table-scroll"><table><thead><tr><th>回执</th><th>策略</th><th>原因码</th><th>说明</th><th>时间</th></tr></thead>
+  <tbody>{% for a in decisions.attempts %}<tr><td class="mono">{{ a.receipt }}</td><td>{{ a.policy }}</td><td class="fail">{{ a.code }}</td><td class="note">{{ a.detail }}</td><td class="mono">{{ a.created_at[:19] }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+</section>
+</div>
+<script>
+const decideForm=document.querySelector('#decision-form');
+const decideOut=document.querySelector('#decision-message');
+const decideButton=document.querySelector('#decide');
+decideForm.addEventListener('submit',async event=>{
+  event.preventDefault();
+  if(decideButton.disabled)return;
+  decideButton.disabled=true;
+  decideOut.textContent='落定中…';
+  try{
+    const response=await fetch('/api/repair/{{ state.manifest.run_id }}/decide',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({policy:document.querySelector('#policy').value})});
+    const data=await response.json();
+    if(!response.ok)throw Error(data.detail||data.code||'裁定失败');
+    decideOut.textContent=(data.idempotent?'回执已存在，未新增结果；':'裁定已落定；')+'v'+data.version+' / '+data.receipt;
+    setTimeout(()=>location.reload(),450);
+  }catch(error){
+    decideOut.textContent=error.message;
+    decideButton.disabled=false;
+  }
+});
+</script>
+{% endblock %}
